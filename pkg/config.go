@@ -5,7 +5,7 @@ import (
 )
 
 const (
-	CODEPATH = "/tmp/app/minio/"
+	DOCKERFILEPATH = "/home/zhang/buildRun/cmd/docker/" //env DOCKERFILE
 )
 
 func NewConfig() {
