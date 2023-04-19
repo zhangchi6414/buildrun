@@ -50,19 +50,20 @@ func (d *stiDocker) PushImage(cli *client.Client, name string) error {
 		RegistryAuth:  authStr,
 		PrivilegeFunc: nil,
 	})
-	if err != nil {
-		zap.S().Error(err)
-		return err
-	}
 	defer pushReader.Close()
 	//输出推送进度
 	_ = logImage(pushReader)
-	zap.S().Info("Image push success!")
+	if err != nil {
+		os.Exit(pkg.PUSHIMAGEERROR)
+		zap.S().Error(err)
+		return err
+	}
+	zap.S().Info("push success ! ", name)
 	return nil
 }
-func (d *stiDocker) LoadImage(cli *client.Client, name string) error {
+func (d *stiDocker) LoadImage(cli *client.Client, code, oldName, name string) error {
 	//打开镜像文件
-	imageFile, err := os.Open(name)
+	imageFile, err := os.Open(code)
 	if err != nil {
 		zap.S().Error(err)
 	}
@@ -70,19 +71,29 @@ func (d *stiDocker) LoadImage(cli *client.Client, name string) error {
 	ctx := context.Background()
 	zap.S().Info("Start load image")
 	load, err := cli.ImageLoad(ctx, imageFile, true)
-	if err != nil {
-		zap.S().Error(err)
-	}
+
 	defer load.Body.Close()
 	//load镜像
 	str := logImage(load.Body)
+	//_ = logImage(load.Body)
+	if err != nil {
+		os.Exit(pkg.LOADIMAGEERROR)
+		zap.S().Error(err)
+	}
 	//获取load后的镜像名称
 	start := strings.Index(str, ": ") + 2
 	end := strings.Index(str[start:], "\\n")
 	imageName := str[start : start+end]
 	zap.S().Info("Image load success!")
+	if name == "" {
+		name = imageName
+	}
+	err = cli.ImageTag(ctx, oldName, name)
+	if err != nil {
+		return err
+	}
 	//导入镜像
-	err = d.PushImage(cli, imageName)
+	err = d.PushImage(cli, name)
 	if err != nil {
 		return err
 	}
@@ -105,11 +116,11 @@ func (d *stiDocker) ImportImage(cli *client.Client, name, imageName string) erro
 	zap.S().Info("Start import image!")
 	imageImport, err := cli.ImageImport(ctx, source, imageName, options)
 	defer imageImport.Close()
+	_ = logImage(imageImport)
 	if err != nil {
+		os.Exit(pkg.IMPORTIMAGEERROR)
 		return err
 	}
-	_ = logImage(imageImport)
-	zap.S().Info("Image Import success!")
 	//推送镜像
 	err = d.PushImage(cli, imageName)
 
@@ -128,8 +139,13 @@ func (d *stiDocker) BuildImage(cli *client.Client, codeName, name string) error 
 		ForceRemove:    true,
 		PullParent:     true,
 	}
-	//拷贝文件到Dockerfile目录下
-	err := utils.Copy(codeName, pkg.DOCKERFILEPATH+codeName)
+	//拷贝Dockerfile
+	err := utils.Copy(pkg.DOCKERFILE, pkg.DOCKERFILEPATH+"Dockerfile")
+	if err != nil {
+		return err
+	}
+	//拷贝代码文件
+	err = utils.Copy(codeName, pkg.DOCKERFILEPATH+codeName)
 	if err != nil {
 		return err
 	}

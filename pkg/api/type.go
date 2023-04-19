@@ -23,3 +23,4 @@ type DockerConfig struct {
 	// TLSVerify indicates if TLS peer must be verified
 	TLSVerify bool `json:"tlsVerify,omitempty"`
 }
+

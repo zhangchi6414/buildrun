@@ -69,7 +69,8 @@ func Tars(src []string, name string) error {
 // failIfExist 标记如果 dstTar 文件存在，是否放弃打包，如果否，则会覆盖已存在的文件
 func Tar(src string, dstTar string, failIfExist bool) (err error) {
 	// 清理路径字符串
-	src = path.Clean(src)
+	//src = path.Clean(src)
+	fmt.Println(src)
 
 	// 判断要打包的文件或目录是否存在
 	if !Exists(src) {
