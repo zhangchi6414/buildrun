@@ -46,6 +46,34 @@ type stiDocker struct {
 func (d stiDocker) NewClient() (*client.Client, error) {
 	return client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 }
+func (d *stiDocker) PullImage(cli *client.Client, name string) error {
+	authConfig := types.AuthConfig{
+		Username: os.Getenv("HARBORK"),
+		Password: os.Getenv("HARBORV"),
+	}
+
+	authConfigEncoded, err := encodeAuthToBase64(authConfig)
+	if err != nil {
+		return err
+	}
+	pullOptions := types.ImagePullOptions{
+		RegistryAuth: authConfigEncoded,
+	}
+	ctx := context.Background()
+	zap.S().Info("获取基础镜像")
+
+	out, err := cli.ImagePull(ctx, name, pullOptions)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	str := logImage(out)
+	if strings.Contains(str, "error") {
+		return fmt.Errorf("基础镜像获取失败！", os.Getenv("OLDIMAGE"))
+	}
+
+	return nil
+}
 func (d *stiDocker) PushImage(cli *client.Client, name string) error {
 	//harbor认证
 	authConfig := types.AuthConfig{
@@ -95,6 +123,13 @@ func (d *stiDocker) PushImage(cli *client.Client, name string) error {
 						zap.S().Info("pushing image:", name, msg.Progress.String())
 					}
 				}
+				//body, err := io.ReadAll(resp)
+				//if err != nil {
+				//	return err
+				//}
+				//if strings.Contains(string(body), "error") {
+				//	return fmt.Errorf("build image error！请检查构建镜像参数是否正确！")
+				//}
 			}
 		})
 		if err == nil {
@@ -115,13 +150,13 @@ func (d *stiDocker) PushImage(cli *client.Client, name string) error {
 
 		zap.S().Info("retrying in %s ...", pkg.DefaultPullRetryDelay)
 		time.Sleep(pkg.DefaultPullRetryDelay)
+
 	}
-	zap.S().Info("push success ! ", name)
 	if err != nil {
 		zap.S().Error("Push image failed!")
 		return err
 	}
-
+	zap.S().Info("push success ! ", name)
 	//读取镜像文件
 	//zap.S().Info("start push image：", name)
 	//var pushReader io.ReadCloser
@@ -217,7 +252,7 @@ func (d *stiDocker) BuildImage(cli *client.Client, name string) error {
 		SuppressOutput: false,
 		Remove:         true,
 		ForceRemove:    true,
-		PullParent:     true,
+		PullParent:     false,
 	}
 	//拷贝Dockerfile
 	err := utils.Copy(pkg.DOCKERFILE, pkg.DOCKERFILEPATH+"Dockerfile")
@@ -244,13 +279,11 @@ func (d *stiDocker) BuildImage(cli *client.Client, name string) error {
 		zap.S().Error(err)
 		return err
 	}
-	_ = logImage(buildResponse.Body)
-	dockerfile, err := os.Open("docker/Dockerfile")
-	defer dockerfile.Close()
 
-	if err != nil {
-		_ = logImage(dockerfile)
-		return err
+	//_ = logImage(buildResponse.Body)
+	str := logImage(buildResponse.Body)
+	if strings.Contains(str, "error") {
+		return fmt.Errorf("build image error！请检查构建镜像参数是否正确！")
 	}
 
 	zap.S().Info("build image:", name, "success!")

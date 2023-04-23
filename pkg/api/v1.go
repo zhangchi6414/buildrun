@@ -31,13 +31,20 @@ func Run() {
 		zap.S().Error(err)
 		os.Exit(pkg.DOCKERERROR)
 	}
+	oldImage := os.Getenv("OLDIMAGE")
 	if os.Getenv("JobType") == "minio" {
 		zap.S().Info("The type build!")
+		err = dc.PullImage(cli, oldImage)
+		if err != nil {
+			zap.S().Error(err)
+			os.Exit(pkg.RUNERROR)
+		}
 		err = dc.BuildImage(cli, newImage)
 		if err != nil {
 			zap.S().Error(err)
 			os.Exit(pkg.RUNERROR)
 		}
+		os.Exit(0)
 	}
 
 	minioOption := minioFucn()
@@ -50,6 +57,7 @@ func Run() {
 			zap.S().Error(err)
 			os.Exit(pkg.MINIOERROR)
 		}
+		os.Exit(0)
 	case "export":
 		zap.S().Info("The type export!")
 		err = dc.ImportImage(cli, minioOption.CodeName, newImage)
@@ -57,7 +65,7 @@ func Run() {
 			zap.S().Error(err)
 			os.Exit(pkg.RUNERROR)
 		}
-
+		os.Exit(0)
 	}
 	//zap.S().Info("The type build!")
 	//err = dc.BuildImage(cli, minioOption.CodeName, newImage)
