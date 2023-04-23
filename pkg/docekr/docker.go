@@ -7,12 +7,27 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
+	dockermessage "github.com/docker/docker/pkg/jsonmessage"
 	"go.uber.org/zap"
 	"io"
 	"os"
 	"strings"
+	"time"
+)
+
+var (
+	// RetriableErrors is a set of strings that indicate that an retriable error occurred.
+	RetriableErrors = []string{
+		"ping attempt failed with error",
+		"is already in progress",
+		"connection reset by peer",
+		"transport closed before response was received",
+		"connection refused",
+	}
 )
 
 type Docker interface {
@@ -42,24 +57,88 @@ func (d *stiDocker) PushImage(cli *client.Client, name string) error {
 		zap.S().Error(err)
 		return err
 	}
-	//读取镜像文件
-	zap.S().Info("start push image：", name)
-	var pushReader io.ReadCloser
-	pushReader, err = cli.ImagePush(context.Background(), name, types.ImagePushOptions{
-		All:           false,
-		RegistryAuth:  authStr,
-		PrivilegeFunc: nil,
-	})
-	defer pushReader.Close()
-	//输出推送进度
-	_ = logImage(pushReader)
-	if err != nil {
-		os.Exit(pkg.PUSHIMAGEERROR)
-		zap.S().Error(err)
-		return err
+	retriableError := false
+	for retries := 0; retries <= pkg.DefaultPushRetryCount; retries++ {
+		err = utils.TimeoutAfter(pkg.DefaultDockerTimeout, fmt.Sprintf("pushing image %q", name), func(timer *time.Timer) error {
+			resp, pushErr := cli.ImagePush(context.Background(), name, types.ImagePushOptions{
+				All:           false,
+				RegistryAuth:  authStr,
+				PrivilegeFunc: nil,
+			})
+			if pushErr != nil {
+				return pushErr
+			}
+			defer resp.Close()
+
+			decoder := json.NewDecoder(resp)
+			for {
+				if !timer.Stop() {
+					return &utils.TimeoutError{}
+				}
+				timer.Reset(pkg.DefaultDockerTimeout)
+
+				var msg dockermessage.JSONMessage
+				pushErr = decoder.Decode(&msg)
+				if pushErr == io.EOF {
+					return nil
+				}
+				if pushErr != nil {
+					return pushErr
+				}
+
+				if msg.Error != nil {
+					return msg.Error
+				}
+
+				if msg.Progress != nil {
+					if msg.Progress.Current != 0 {
+						zap.S().Info("pushing image:", name, msg.Progress.String())
+					}
+				}
+			}
+		})
+		if err == nil {
+			break
+		}
+		zap.S().Error("pushing image error : %v", err)
+		errMsg := fmt.Sprintf("%s", err)
+		for _, errorString := range RetriableErrors {
+			if strings.Contains(errMsg, errorString) {
+				retriableError = true
+				break
+			}
+		}
+
+		if !retriableError {
+			return errors.New("Push image failed")
+		}
+
+		zap.S().Info("retrying in %s ...", pkg.DefaultPullRetryDelay)
+		time.Sleep(pkg.DefaultPullRetryDelay)
 	}
 	zap.S().Info("push success ! ", name)
-	os.Exit(0)
+	if err != nil {
+		zap.S().Error("Push image failed!")
+		return err
+	}
+
+	//读取镜像文件
+	//zap.S().Info("start push image：", name)
+	//var pushReader io.ReadCloser
+	//pushReader, err = cli.ImagePush(context.Background(), name, types.ImagePushOptions{
+	//	All:           false,
+	//	RegistryAuth:  authStr,
+	//	PrivilegeFunc: nil,
+	//})
+	//defer pushReader.Close()
+	////输出推送进度
+	//_ = logImage(pushReader)
+	//if err != nil {
+	//	os.Exit(pkg.PUSHIMAGEERROR)
+	//	zap.S().Error(err)
+	//	return err
+	//}
+
 	return nil
 }
 func (d *stiDocker) LoadImage(cli *client.Client, code, oldName, name string) error {
@@ -145,11 +224,6 @@ func (d *stiDocker) BuildImage(cli *client.Client, name string) error {
 	if err != nil {
 		return err
 	}
-	//拷贝代码文件
-	//err = utils.Copy(codeName, pkg.DOCKERFILEPATH+codeName)
-	//if err != nil {
-	//	return err
-	//}
 	var destTar = "docker.tar"
 	//把文件打成tar包
 	err = utils.Tar(pkg.DOCKERFILEPATH, destTar, false)
@@ -157,7 +231,7 @@ func (d *stiDocker) BuildImage(cli *client.Client, name string) error {
 		zap.S().Error(err)
 		return err
 	}
-	//执行构建
+
 	zap.S().Info("Start build image:", name)
 	ctx := context.Background()
 	dockerBuildContext, err := os.Open(destTar)
@@ -171,7 +245,15 @@ func (d *stiDocker) BuildImage(cli *client.Client, name string) error {
 		return err
 	}
 	_ = logImage(buildResponse.Body)
-	zap.S().Info("Start build image:", name, "success!")
+	dockerfile, err := os.Open("docker/Dockerfile")
+	defer dockerfile.Close()
+
+	if err != nil {
+		_ = logImage(dockerfile)
+		return err
+	}
+
+	zap.S().Info("build image:", name, "success!")
 	err = d.PushImage(cli, name)
 	if err != nil {
 		zap.S().Error(err)

@@ -2,6 +2,7 @@ package pkg
 
 import (
 	"buildRun/pkg/logger"
+	"time"
 )
 
 const (
@@ -17,6 +18,13 @@ const (
 	IMPORTIMAGEERROR
 	PUSHIMAGEERROR
 	DOCKERERROR
+)
+
+const (
+	DefaultDockerTimeout  = 4 * time.Minute
+	DefaultPullRetryCount = 6
+	DefaultPushRetryCount = 2
+	DefaultPullRetryDelay = 5 * time.Second
 )
 
 func NewConfig() {
