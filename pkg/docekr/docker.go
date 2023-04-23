@@ -59,6 +59,7 @@ func (d *stiDocker) PushImage(cli *client.Client, name string) error {
 		return err
 	}
 	zap.S().Info("push success ! ", name)
+	os.Exit(0)
 	return nil
 }
 func (d *stiDocker) LoadImage(cli *client.Client, code, oldName, name string) error {
@@ -129,7 +130,7 @@ func (d *stiDocker) ImportImage(cli *client.Client, name, imageName string) erro
 	}
 	return nil
 }
-func (d *stiDocker) BuildImage(cli *client.Client, codeName, name string) error {
+func (d *stiDocker) BuildImage(cli *client.Client, name string) error {
 	var tags = []string{name}
 	fileOptions := types.ImageBuildOptions{
 		Tags:           tags,
@@ -145,10 +146,10 @@ func (d *stiDocker) BuildImage(cli *client.Client, codeName, name string) error 
 		return err
 	}
 	//拷贝代码文件
-	err = utils.Copy(codeName, pkg.DOCKERFILEPATH+codeName)
-	if err != nil {
-		return err
-	}
+	//err = utils.Copy(codeName, pkg.DOCKERFILEPATH+codeName)
+	//if err != nil {
+	//	return err
+	//}
 	var destTar = "docker.tar"
 	//把文件打成tar包
 	err = utils.Tar(pkg.DOCKERFILEPATH, destTar, false)

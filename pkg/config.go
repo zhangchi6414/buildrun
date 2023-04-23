@@ -5,7 +5,18 @@ import (
 )
 
 const (
-	DOCKERFILEPATH = "/home/zhang/buildRun/cmd/docker/" //env DOCKERFILE
+	DOCKERFILEPATH = "/root/docker/" //env DOCKERFILE
+	DOCKERFILE     = "/config/Dockerfile"
+)
+
+const (
+	RUNERROR       = 100
+	MINIOERROR     = 101
+	GITERROR       = 102
+	LOADIMAGEERROR = 103
+	IMPORTIMAGEERROR
+	PUSHIMAGEERROR
+	DOCKERERROR
 )
 
 func NewConfig() {
