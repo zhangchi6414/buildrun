@@ -46,6 +46,7 @@ type stiDocker struct {
 func (d stiDocker) NewClient() (*client.Client, error) {
 	return client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 }
+
 func (d *stiDocker) PullImage(cli *client.Client, name string) error {
 	authConfig := types.AuthConfig{
 		Username: os.Getenv("HARBORK"),
@@ -74,6 +75,7 @@ func (d *stiDocker) PullImage(cli *client.Client, name string) error {
 
 	return nil
 }
+
 func (d *stiDocker) PushImage(cli *client.Client, name string) error {
 	//harbor认证
 	authConfig := types.AuthConfig{
