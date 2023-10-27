@@ -15,6 +15,7 @@ const (
 	MINIOERROR     = 101
 	GITERROR       = 102
 	LOADIMAGEERROR = 103
+	FROMIMAGEERROR = 104
 	IMPORTIMAGEERROR
 	PUSHIMAGEERROR
 	DOCKERERROR
@@ -24,7 +25,7 @@ const (
 	DefaultDockerTimeout  = 4 * time.Minute
 	DefaultPullRetryCount = 6
 	DefaultPushRetryCount = 2
-	DefaultPullRetryDelay = 5 * time.Second
+	DefaultPullRetryDelay = 10 * time.Second
 )
 
 func NewConfig() {

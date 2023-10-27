@@ -15,6 +15,7 @@ import (
 	"go.uber.org/zap"
 	"io"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 )
@@ -261,6 +262,24 @@ func (d *stiDocker) BuildImage(cli *client.Client, name string) error {
 	if err != nil {
 		return err
 	}
+	//拷贝要放到容器内的文件
+	nfsPath := os.Getenv("NFSPATH")
+	if nfsPath != "" {
+		fmt.Println("开始拷贝文件！")
+		pathList := strings.Split(nfsPath, ",")
+		for _, path := range pathList {
+			pathList := strings.Split(path, "/")
+			dir := pathList[len(pathList)-1]
+			cmd := exec.Command("cp", "-r", path, pkg.DOCKERFILEPATH+dir)
+			output, err := cmd.Output()
+			if err != nil {
+				fmt.Println("执行命令时出错:", err)
+				return err
+			}
+			fmt.Println(output)
+		}
+	}
+
 	var destTar = "docker.tar"
 	//把文件打成tar包
 	err = utils.Tar(pkg.DOCKERFILEPATH, destTar, false)
@@ -321,3 +340,25 @@ func logImage(reader io.Reader) string {
 	zap.S().Info(s1)
 	return s1
 }
+
+//// // 判断需要拷贝的文件类型
+//func fileType(path string) error {
+//	fileInfo, err := os.Stat(path)
+//	if err != nil {
+//		return err
+//	}
+//	//判断是否为目录
+//	if fileInfo.IsDir() {
+//		pathList := strings.Split(path, "/")
+//		dir := pathList[len(pathList)-1]
+//		err := os.MkdirAll(pkg.DOCKERFILEPATH+dir, 0755)
+//		if err != nil {
+//			return err
+//		}
+//	}
+//	err = utils.Copy(path, pkg.DOCKERFILEPATH+path)
+//	if err != nil {
+//		return err
+//	}
+//	return nil
+//}

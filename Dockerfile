@@ -7,7 +7,7 @@ COPY utils/ utils/
 
 
 # Build
-RUN  go env -w GOPROXY=https://mirrors.aliyun.com/goproxy/,direct && \
+RUN  go env -w GOPROXY=https://goproxy.cn,direct && \
      cd /go/src/buildRun/ && \
      go mod init buildRun && \
      go mod tidy && \
@@ -21,6 +21,6 @@ RUN mkdir /root/docker/
 #RUN apk update && apk upgrade && \
 #    apk add --no-cache bash git openssh
 
-COPY --from=builder /root/builder .
+COPY --from=builder /go/src/buildRun/builder .
 CMD ["./builder"]
 

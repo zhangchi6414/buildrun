@@ -76,15 +76,25 @@ func Run() {
 }
 
 func minioFucn() *minio.MinioOption {
+	//minioOption := &minio.MinioOption{
+	//	Endpoint:        os.Getenv("MinioUrl"),
+	//	DisableSSL:      false,
+	//	ForcePathStyle:  "./",
+	//	AccessKeyID:     os.Getenv("MINIOK"),
+	//	SecretAccessKey: os.Getenv("MINIOV"),
+	//	Bucket:          os.Getenv("MinioBucket"),
+	//	CodeName:        os.Getenv("Code"),
+	//	CodePath:        os.Getenv("CodePath"),
+	//}
 	minioOption := &minio.MinioOption{
-		Endpoint:        os.Getenv("MinioUrl"),
+		Endpoint:        "192.168.2.103:32000",
 		DisableSSL:      false,
 		ForcePathStyle:  "./",
-		AccessKeyID:     os.Getenv("MINIOK"),
-		SecretAccessKey: os.Getenv("MINIOV"),
-		Bucket:          os.Getenv("MinioBucket"),
-		CodeName:        os.Getenv("Code"),
-		CodePath:        os.Getenv("CodePath"),
+		AccessKeyID:     "admin",
+		SecretAccessKey: "abcdefg123456",
+		Bucket:          "dyg-fzzn",
+		CodeName:        "fz-server-pro54.tar.gz",
+		CodePath:        "/fz-1/uploader/fz-server-pro54.tar.gz",
 	}
 	minioCli, err := minioOption.MinioClient()
 	if err != nil {
